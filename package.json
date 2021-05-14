@@ -1,13 +1,15 @@
 {
   "name": "responsive-route-snapshotter",
-  "version": "0.0.0",
-  "description": "Capture deterministic route screenshots at chosen viewport and device profiles.",
+  "version": "1.0.0",
+  "description": "Compare two pre-captured local route screenshot manifests offline.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test"
+    "lint": "node --check src/index.mjs && node --check bin/responsive-route-snapshotter.mjs",
+    "test": "node --test",
+    "check": "npm run lint && npm test"
   },
   "license": "MIT",
   "repository": {

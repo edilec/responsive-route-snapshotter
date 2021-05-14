@@ -1,25 +1,31 @@
 # Responsive Route Snapshotter
 
-Capture deterministic route screenshots at chosen viewport and device profiles.
+`TOOL_ID=responsive-route-snapshotter`. Zero-dependency Node 22+ auditor of two pre-captured local route screenshot manifests. It does **not** launch Playwright, drive a browser, capture images, or save new screenshots. This is the offline scope adaptation of the original capture-oriented matrix row. A separate capture process must supply both manifests and their image files. The tool reads and hashes those files, compares controlled runs, and emits a deterministic JSON report.
 
-- **Repository:** [edilec/responsive-route-snapshotter](https://github.com/edilec/responsive-route-snapshotter)
-- **Area:** Web & UX
-- **License:** MIT
+```sh
+node bin/responsive-route-snapshotter.mjs --root examples/pass --baseline baseline.json --current current.json
+node bin/responsive-route-snapshotter.mjs --root examples/fail --baseline baseline.json --current current.json
+npm run check
+```
 
-## Scope
+The examples exit `0` and `1`. `--help` prints usage; `--human` adds a terse stderr summary. The library exports `TOOL_ID`, `LIMITS`, and async `compareSnapshots(baseline,current,{readScreenshot,now})`. No screenshot read occurs without the supplied callback. The CLI confines every manifest and screenshot realpath to the real `--root` and never writes or fetches.
 
-This repository is a focused Edilec engineering utility. Its implementation, tests, usage examples, release notes, and security guidance will be kept in this repository as the tool is built. It does not contain client work, production data, credentials, or copied source from another project.
+## Manifest and comparison
 
-## Repository layout
+Each UTF-8 JSON manifest has `schemaVersion:"1"`, `capture:{viewport:{width,height},locale,timeZone,seed}`, and a nonempty `routes` array. Width and height are integers 1–4096; locale, timezone, and seed are nonempty bounded strings. Each route has a slash-prefixed ASCII `route`, `status` (`ready`, `failed`, or `unfinished`), and boolean `fontsReady`. A ready route additionally requires a root-relative `screenshot` path and its lowercase SHA-256 `sha256`. The image bytes are hashed and checked against the claimed digest before the two captures are compared. No image is decoded or rendered; the SVGs in `examples/` are small synthetic image fixtures, not browser captures.
 
-- `src/` — implementation
-- `test/` — deterministic tests and fixtures
-- `docs/` — design notes, limits, and usage guidance
+Viewport, locale, timezone, and seed must match. The same real manifest file cannot be supplied twice. Manifest route order and JSON key order do not affect pairing; duplicate identities or missing routes are incomplete. A failed or unfinished route, a missing font, or unavailable or unverified image is an explicit capture error and cannot pass. Other healthy routes are still compared. Different verified image hashes on a controlled route yield `snapshot-changed` and exit `1`. This is byte comparison, not pixel tolerance or a claim that two independent captures really happened; copied or fabricated manifests cannot be authenticated.
 
-## Development
+## Rules and limits
 
-The first implementation should document its input contract, output contract, limits, failure behavior, and verification command before a release is made.
+Findings use `@baseline` and `@current` as logical source roles with zero-based `/routes/N` pointers into the exact named manifests. No route name, path, digest, locale, or file content appears in the report. Findings sort by `(location.file, location.pointer, ruleId)` in code-unit order.
 
-## License
+| Rule | Severity | Result |
+| --- | --- | --- |
+| `input-unreadable`, `input-invalid`, `byte-limit`, `record-limit`, `depth-limit`, `time-limit`, `capture-mismatch` | warning | incomplete |
+| `route-invalid`, `route-duplicate`, `route-missing`, `route-failed`, `route-unfinished`, `font-not-ready`, `screenshot-unavailable`, `screenshot-hash-mismatch` | warning | incomplete |
+| `snapshot-changed` | error | fail unless another route is incomplete |
 
-MIT. See [LICENSE](./LICENSE).
+Exit `0` is pass, `1` is a completed differing comparison, and `2` is incomplete evidence or invalid usage. Bad usage has empty stdout and a stderr diagnostic. Unreadable, non-UTF-8, malformed, or over-limit input produces an incomplete JSON report. JSON stdout uses the catalog v1 envelope; `--human` writes only to stderr.
+
+Limits: 1,048,576 bytes per manifest; 8,388,608 bytes per screenshot; 1,000 routes per manifest; JSON depth 16; 5,000 ms evaluation time. Exactly N is permitted, N+1 is incomplete. No browser state, animation stability, color-space equivalence, visual regression tolerance, or font availability is inferred beyond the captured metadata.
