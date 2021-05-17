@@ -8,11 +8,11 @@ node bin/responsive-route-snapshotter.mjs --root examples/fail --baseline baseli
 npm run check
 ```
 
-The examples exit `0` and `1`. `--help` prints usage; `--human` adds a terse stderr summary. The library exports `TOOL_ID`, `LIMITS`, and async `compareSnapshots(baseline,current,{readScreenshot,now})`. No screenshot read occurs without the supplied callback. The CLI confines every manifest and screenshot realpath to the real `--root` and never writes or fetches.
+The examples exit `0` and `1`. `--help` prints usage; `--human` adds a terse stderr summary. The library exports `TOOL_ID`, `LIMITS`, and async `compareSnapshots(baseline,current,{readScreenshot,now})`. The direct library callback is trusted evidence; only the CLI verifies that image bytes came from a regular local file whose realpath stays inside `--root`. No screenshot read occurs without the supplied callback. The CLI never writes or fetches.
 
 ## Manifest and comparison
 
-Each UTF-8 JSON manifest has `schemaVersion:"1"`, `capture:{viewport:{width,height},locale,timeZone,seed}`, and a nonempty `routes` array. Width and height are integers 1–4096; locale, timezone, and seed are nonempty bounded strings. Each route has a slash-prefixed ASCII `route`, `status` (`ready`, `failed`, or `unfinished`), and boolean `fontsReady`. A ready route additionally requires a root-relative `screenshot` path and its lowercase SHA-256 `sha256`. The image bytes are hashed and checked against the claimed digest before the two captures are compared. No image is decoded or rendered; the SVGs in `examples/` are small synthetic image fixtures, not browser captures.
+Each UTF-8 JSON manifest has `schemaVersion:"1"`, `capture:{viewport:{width,height},locale,timeZone,seed}`, and a nonempty `routes` array. Optional Boolean `complete` on the manifest or `capture` object can declare coverage; either set to `false` forces incomplete, while absence cannot authenticate upstream completeness. Width and height are integers 1–4096; locale, timezone, and seed are nonempty bounded strings. Each route has a slash-prefixed ASCII `route`, `status` (`ready`, `failed`, or `unfinished`), and boolean `fontsReady`. A ready route additionally requires a root-relative `screenshot` path and its lowercase SHA-256 `sha256`. The image bytes are hashed and checked against the claimed digest before the two captures are compared. No image is decoded or rendered; the SVGs in `examples/` are small synthetic image fixtures, not browser captures.
 
 Viewport, locale, timezone, and seed must match. The same real manifest file cannot be supplied twice. Manifest route order and JSON key order do not affect pairing; duplicate identities or missing routes are incomplete. A failed or unfinished route, a missing font, or unavailable or unverified image is an explicit capture error and cannot pass. Other healthy routes are still compared. Different verified image hashes on a controlled route yield `snapshot-changed` and exit `1`. This is byte comparison, not pixel tolerance or a claim that two independent captures really happened; copied or fabricated manifests cannot be authenticated.
 
@@ -22,7 +22,7 @@ Findings use `@baseline` and `@current` as logical source roles with zero-based 
 
 | Rule | Severity | Result |
 | --- | --- | --- |
-| `input-unreadable`, `input-invalid`, `byte-limit`, `record-limit`, `depth-limit`, `time-limit`, `capture-mismatch` | warning | incomplete |
+| `input-unreadable`, `input-invalid`, `export-incomplete`, `byte-limit`, `record-limit`, `depth-limit`, `time-limit`, `capture-mismatch` | warning | incomplete |
 | `route-invalid`, `route-duplicate`, `route-missing`, `route-failed`, `route-unfinished`, `font-not-ready`, `screenshot-unavailable`, `screenshot-hash-mismatch` | warning | incomplete |
 | `snapshot-changed` | error | fail unless another route is incomplete |
 

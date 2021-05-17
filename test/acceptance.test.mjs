@@ -52,6 +52,15 @@ test('metadata mismatch cannot be presented as visual change or pass',()=>{
   assert.equal(r.status,2);assert.equal(r.report.findings[0].ruleId,'capture-mismatch');
 });
 
+test('explicitly partial capture coverage cannot pass at either marker',()=>{
+  const a=manifest();a.complete=false;
+  const first=run(a,manifest());
+  assert.equal(first.status,2);assert.equal(first.report.findings[0].ruleId,'export-incomplete');
+  const c=manifest();c.capture.complete=false;
+  const second=run(manifest(),c);
+  assert.equal(second.status,2);assert.equal(second.report.findings[0].ruleId,'export-incomplete');
+});
+
 test('equivalent capture controls with reordered JSON fields still compare',()=>{
   const c=manifest();c.capture={seed:'fixture-1',timeZone:'UTC',locale:'en-US',viewport:{height:720,width:1280}};
   assert.equal(run(manifest(),c).status,0);

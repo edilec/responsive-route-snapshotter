@@ -2,25 +2,30 @@ import {createHash} from 'node:crypto';
 
 export const TOOL_ID='responsive-route-snapshotter';
 export const LIMITS=Object.freeze({manifestBytes:1_048_576,screenshotBytes:8_388_608,routes:1000,depth:16,milliseconds:5000});
-const severity=Object.freeze({'input-unreadable':'warning','input-invalid':'warning','byte-limit':'warning','record-limit':'warning','depth-limit':'warning','time-limit':'warning','capture-mismatch':'warning','route-invalid':'warning','route-duplicate':'warning','route-missing':'warning','route-failed':'warning','route-unfinished':'warning','font-not-ready':'warning','screenshot-unavailable':'warning','screenshot-hash-mismatch':'warning','snapshot-changed':'error'});
-const messages=Object.freeze({'input-unreadable':'Manifest could not be read, decoded, or parsed.','input-invalid':'Expected a supported version 1 capture manifest.','byte-limit':'Manifest or screenshot exceeds its declared byte limit.','record-limit':'Route count exceeds 1000.','depth-limit':'JSON nesting exceeds depth 16.','time-limit':'Evaluation exceeded 5000 milliseconds.','capture-mismatch':'Capture controls differ between manifests.','route-invalid':'Route capture record is invalid.','route-duplicate':'Route identity is duplicated.','route-missing':'Route has no matching capture in the other manifest.','route-failed':'Route capture failed.','route-unfinished':'Route capture was unfinished.','font-not-ready':'Fonts were not ready for this capture.','screenshot-unavailable':'Screenshot artifact is unavailable within the root.','screenshot-hash-mismatch':'Screenshot bytes disagree with the recorded digest.','snapshot-changed':'Controlled screenshot bytes differ between captures.'});
+const severity=Object.freeze({'input-unreadable':'warning','input-invalid':'warning','export-incomplete':'warning','byte-limit':'warning','record-limit':'warning','depth-limit':'warning','time-limit':'warning','capture-mismatch':'warning','route-invalid':'warning','route-duplicate':'warning','route-missing':'warning','route-failed':'warning','route-unfinished':'warning','font-not-ready':'warning','screenshot-unavailable':'warning','screenshot-hash-mismatch':'warning','snapshot-changed':'error'});
+const messages=Object.freeze({'input-unreadable':'Manifest could not be read, decoded, or parsed.','input-invalid':'Expected a supported version 1 capture manifest.','export-incomplete':'Capture manifest explicitly declares incomplete coverage.','byte-limit':'Manifest or screenshot exceeds its declared byte limit.','record-limit':'Route count exceeds 1000.','depth-limit':'JSON nesting exceeds depth 16.','time-limit':'Evaluation exceeded 5000 milliseconds.','capture-mismatch':'Capture controls differ between manifests.','route-invalid':'Route capture record is invalid.','route-duplicate':'Route identity is duplicated.','route-missing':'Route has no matching capture in the other manifest.','route-failed':'Route capture failed.','route-unfinished':'Route capture was unfinished.','font-not-ready':'Fonts were not ready for this capture.','screenshot-unavailable':'Screenshot artifact is unavailable within the root.','screenshot-hash-mismatch':'Screenshot bytes disagree with the recorded digest.','snapshot-changed':'Controlled screenshot bytes differ between captures.'});
 const cmp=(a,b)=>a<b?-1:a>b?1:0;
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const safe=x=>typeof x==='string'&&x.length>0&&x.length<=240&&!/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\p{Cf}]/u.test(x);
 const route=x=>safe(x)&&/^\/[A-Za-z0-9/_-]*$/.test(x);
 const digest=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
-const capture=x=>obj(x)&&obj(x.viewport)&&Number.isInteger(x.viewport.width)&&x.viewport.width>=1&&x.viewport.width<=4096&&Number.isInteger(x.viewport.height)&&x.viewport.height>=1&&x.viewport.height<=4096&&safe(x.locale)&&safe(x.timeZone)&&safe(x.seed);
+const capture=x=>obj(x)&&(x.complete===undefined||typeof x.complete==='boolean')&&obj(x.viewport)&&Number.isInteger(x.viewport.width)&&x.viewport.width>=1&&x.viewport.width<=4096&&Number.isInteger(x.viewport.height)&&x.viewport.height>=1&&x.viewport.height<=4096&&safe(x.locale)&&safe(x.timeZone)&&safe(x.seed);
 function finding(ruleId,file,pointer=''){if(!Object.hasOwn(severity,ruleId))throw Error('unknown rule');return {ruleId,severity:severity[ruleId],message:messages[ruleId],location:{file,pointer}};}
 function report(findings,checked=0){findings.sort((a,b)=>cmp(a.location.file,b.location.file)||cmp(a.location.pointer,b.location.pointer)||cmp(a.ruleId,b.ruleId));const status=findings.some(f=>f.severity==='warning')?'incomplete':findings.length?'fail':'pass';return {schemaVersion:'1',tool:TOOL_ID,status,summary:{checked,errors:findings.filter(f=>f.severity==='error').length,warnings:findings.filter(f=>f.severity==='warning').length},findings};}
 export function incomplete(ruleId,file){return report([finding(ruleId,file)]);}
 function tooDeep(value){const stack=[[value,0]];while(stack.length){const [x,d]=stack.pop();if(d>LIMITS.depth)return true;if(x&&typeof x==='object')for(const child of Object.values(x))stack.push([child,d+1]);}return false;}
-function validManifest(x){return obj(x)&&x.schemaVersion==='1'&&capture(x.capture)&&Array.isArray(x.routes)&&x.routes.length>0;}
+function validManifest(x){return obj(x)&&x.schemaVersion==='1'&&(x.complete===undefined||typeof x.complete==='boolean')&&capture(x.capture)&&Array.isArray(x.routes)&&x.routes.length>0;}
 function validRoute(x){return obj(x)&&route(x.route)&&['ready','failed','unfinished'].includes(x.status)&&typeof x.fontsReady==='boolean'&&(x.status!=='ready'||(safe(x.screenshot)&&digest(x.sha256)));}
 
 export async function compareSnapshots(baseline,current,{readScreenshot=async()=>null,now=()=>performance.now()}={}){
   const start=now(),findings=[];
   if(!validManifest(baseline))findings.push(finding('input-invalid','@baseline'));
   if(!validManifest(current))findings.push(finding('input-invalid','@current'));
+  if(findings.length)return report(findings);
+  for(const [file,doc] of [['@baseline',baseline],['@current',current]]){
+    if(doc.complete===false)findings.push(finding('export-incomplete',file,'/complete'));
+    if(doc.capture.complete===false)findings.push(finding('export-incomplete',file,'/capture/complete'));
+  }
   if(findings.length)return report(findings);
   if(tooDeep(baseline))findings.push(finding('depth-limit','@baseline'));
   if(tooDeep(current))findings.push(finding('depth-limit','@current'));
