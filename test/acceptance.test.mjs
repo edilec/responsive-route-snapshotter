@@ -9,8 +9,8 @@ import {spawnSync} from 'node:child_process';
 const cli=new URL('../bin/responsive-route-snapshotter.mjs',import.meta.url).pathname;
 const shot='<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="blue"/></svg>';
 const digest=s=>createHash('sha256').update(s).digest('hex');
-const capture={viewport:{width:1280,height:720},locale:'en-US',timeZone:'UTC',seed:'fixture-1'};
-function manifest(routes=[{route:'/home',status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)}]){return {schemaVersion:'1',capture:structuredClone(capture),routes};}
+const capture={complete:true,viewport:{width:1280,height:720},locale:'en-US',timeZone:'UTC',seed:'fixture-1'};
+function manifest(routes=[{route:'/home',status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)}]){return {schemaVersion:'1',complete:true,capture:structuredClone(capture),routes};}
 function run(base=manifest(),current=manifest(),baseShot=shot,currentShot=shot){
   const root=mkdtempSync(join(tmpdir(),'route-snapshot-'));
   try{
@@ -61,8 +61,17 @@ test('explicitly partial capture coverage cannot pass at either marker',()=>{
   assert.equal(second.status,2);assert.equal(second.report.findings[0].ruleId,'export-incomplete');
 });
 
+test('missing completeness assertions cannot certify a capture comparison',()=>{
+  const a=manifest();delete a.complete;
+  const first=run(a,manifest());
+  assert.equal(first.status,2);assert.equal(first.report.findings[0].ruleId,'export-incomplete');
+  const c=manifest();delete c.capture.complete;
+  const second=run(manifest(),c);
+  assert.equal(second.status,2);assert.equal(second.report.findings[0].ruleId,'export-incomplete');
+});
+
 test('equivalent capture controls with reordered JSON fields still compare',()=>{
-  const c=manifest();c.capture={seed:'fixture-1',timeZone:'UTC',locale:'en-US',viewport:{height:720,width:1280}};
+  const c=manifest();c.capture={seed:'fixture-1',timeZone:'UTC',locale:'en-US',viewport:{height:720,width:1280},complete:true};
   assert.equal(run(manifest(),c).status,0);
 });
 

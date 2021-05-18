@@ -23,8 +23,8 @@ export async function compareSnapshots(baseline,current,{readScreenshot=async()=
   if(!validManifest(current))findings.push(finding('input-invalid','@current'));
   if(findings.length)return report(findings);
   for(const [file,doc] of [['@baseline',baseline],['@current',current]]){
-    if(doc.complete===false)findings.push(finding('export-incomplete',file,'/complete'));
-    if(doc.capture.complete===false)findings.push(finding('export-incomplete',file,'/capture/complete'));
+    if(doc.complete!==true)findings.push(finding('export-incomplete',file,'/complete'));
+    if(doc.capture.complete!==true)findings.push(finding('export-incomplete',file,'/capture/complete'));
   }
   if(findings.length)return report(findings);
   if(tooDeep(baseline))findings.push(finding('depth-limit','@baseline'));
