@@ -75,6 +75,24 @@ test('equivalent capture controls with reordered JSON fields still compare',()=>
   assert.equal(run(manifest(),c).status,0);
 });
 
+test('safe URL paths with a dot and encoded space compare as captured routes',()=>{
+  for(const name of ['/guide.v1','/en%20us']){
+    const a=manifest([{route:name,status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)}]);
+    const r=run(a,structuredClone(a));
+    assert.equal(r.status,0,name);
+    assert.equal(r.report.summary.checked,1);
+  }
+});
+
+test('encoded traversal, controls, and bidi are not accepted as route identities',()=>{
+  for(const name of ['/guide/%2e%2e/private','/path%00','/path%E2%80%AE']){
+    const a=manifest([{route:name,status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)}]);
+    const r=run(a,structuredClone(a));
+    assert.equal(r.status,2,name);
+    assert.equal(r.report.findings[0].ruleId,'route-invalid');
+  }
+});
+
 test('failed route does not hide a different healthy route',()=>{
   const changed='<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="red"/></svg>';
   const b=manifest([{route:'/home',status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)},{route:'/about',status:'ready',fontsReady:true,screenshot:'shot.svg',sha256:digest(shot)}]);

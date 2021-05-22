@@ -7,7 +7,16 @@ const messages=Object.freeze({'input-unreadable':'Manifest could not be read, de
 const cmp=(a,b)=>a<b?-1:a>b?1:0;
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const safe=x=>typeof x==='string'&&x.length>0&&x.length<=240&&!/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\p{Cf}]/u.test(x);
-const route=x=>safe(x)&&/^\/[A-Za-z0-9/_-]*$/.test(x);
+function routeKey(x){
+  if(!safe(x)||!x.startsWith('/')||x.startsWith('//')||/[?#\\]/u.test(x)||/%(?:2f|5c)/iu.test(x))return null;
+  try{
+    const decoded=decodeURIComponent(x);
+    if(!safe(decoded)||decoded.startsWith('//')||decoded.includes('\\')||decoded.split('/').some(part=>part==='.'||part==='..'))return null;
+    const url=new URL(x,'https://route.invalid');
+    if(url.origin!=='https://route.invalid'||url.search||url.hash||decodeURIComponent(url.pathname)!==decoded)return null;
+    return decoded;
+  }catch{return null;}
+}
 const digest=x=>typeof x==='string'&&/^[a-f0-9]{64}$/.test(x);
 const capture=x=>obj(x)&&(x.complete===undefined||typeof x.complete==='boolean')&&obj(x.viewport)&&Number.isInteger(x.viewport.width)&&x.viewport.width>=1&&x.viewport.width<=4096&&Number.isInteger(x.viewport.height)&&x.viewport.height>=1&&x.viewport.height<=4096&&safe(x.locale)&&safe(x.timeZone)&&safe(x.seed);
 function finding(ruleId,file,pointer=''){if(!Object.hasOwn(severity,ruleId))throw Error('unknown rule');return {ruleId,severity:severity[ruleId],message:messages[ruleId],location:{file,pointer}};}
@@ -15,7 +24,7 @@ function report(findings,checked=0){findings.sort((a,b)=>cmp(a.location.file,b.l
 export function incomplete(ruleId,file){return report([finding(ruleId,file)]);}
 function tooDeep(value){const stack=[[value,0]];while(stack.length){const [x,d]=stack.pop();if(d>LIMITS.depth)return true;if(x&&typeof x==='object')for(const child of Object.values(x))stack.push([child,d+1]);}return false;}
 function validManifest(x){return obj(x)&&x.schemaVersion==='1'&&(x.complete===undefined||typeof x.complete==='boolean')&&capture(x.capture)&&Array.isArray(x.routes)&&x.routes.length>0;}
-function validRoute(x){return obj(x)&&route(x.route)&&['ready','failed','unfinished'].includes(x.status)&&typeof x.fontsReady==='boolean'&&(x.status!=='ready'||(safe(x.screenshot)&&digest(x.sha256)));}
+function validRoute(x){return obj(x)&&routeKey(x.route)!==null&&['ready','failed','unfinished'].includes(x.status)&&typeof x.fontsReady==='boolean'&&(x.status!=='ready'||(safe(x.screenshot)&&digest(x.sha256)));}
 
 export async function compareSnapshots(baseline,current,{readScreenshot=async()=>null,now=()=>performance.now()}={}){
   const start=now(),findings=[];
@@ -40,8 +49,9 @@ export async function compareSnapshots(baseline,current,{readScreenshot=async()=
     for(const [i,item] of doc.routes.entries()){
       if(now()-start>LIMITS.milliseconds)return incomplete('time-limit',file);
       if(!validRoute(item)){findings.push(finding('route-invalid',file,`/routes/${i}`));continue;}
-      if(index.has(item.route)){findings.push(finding('route-duplicate',file,`/routes/${i}`));continue;}
-      index.set(item.route,{item,i});
+      const key=routeKey(item.route);
+      if(index.has(key)){findings.push(finding('route-duplicate',file,`/routes/${i}`));continue;}
+      index.set(key,{item,i});
     }
   }
   if(findings.length)return report(findings);
