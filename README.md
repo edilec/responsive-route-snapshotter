@@ -22,10 +22,10 @@ Findings use `@baseline` and `@current` as logical source roles with zero-based 
 
 | Rule | Severity | Result |
 | --- | --- | --- |
-| `input-unreadable`, `input-invalid`, `export-incomplete`, `byte-limit`, `record-limit`, `depth-limit`, `time-limit`, `capture-mismatch` | warning | incomplete |
+| `input-unreadable`, `input-invalid`, `duplicate-key`, `export-incomplete`, `byte-limit`, `record-limit`, `depth-limit`, `time-limit`, `capture-mismatch` | warning | incomplete |
 | `route-invalid`, `route-duplicate`, `route-missing`, `route-failed`, `route-unfinished`, `font-not-ready`, `screenshot-unavailable`, `screenshot-hash-mismatch` | warning | incomplete |
 | `snapshot-changed` | error | fail unless another route is incomplete |
 
-Exit `0` is pass, `1` is a completed differing comparison, and `2` is incomplete evidence or invalid usage. Bad usage has empty stdout and a stderr diagnostic. Unreadable, non-UTF-8, malformed, or over-limit input produces an incomplete JSON report. JSON stdout uses the catalog v1 envelope; `--human` writes only to stderr.
+Exit `0` is pass, `1` is a completed differing comparison, and `2` is incomplete evidence or invalid usage. Bad usage has empty stdout and a stderr diagnostic. Unreadable, non-UTF-8, malformed, duplicate-key, or over-limit input produces an incomplete JSON report. Duplicate keys are checked after escape decoding, so contradictory completeness assertions cannot be hidden by JSON's last-value-wins parsing. JSON stdout uses the catalog v1 envelope; `--human` writes only to stderr.
 
 Limits: 1,048,576 bytes per manifest; 8,388,608 bytes per screenshot; 1,000 routes per manifest; JSON depth 16; 5,000 ms evaluation time. Exactly N is permitted, N+1 is incomplete. No browser state, animation stability, color-space equivalence, visual regression tolerance, or font availability is inferred beyond the captured metadata.

@@ -2,6 +2,7 @@
 import {readFile,realpath,stat} from 'node:fs/promises';
 import {resolve,relative,isAbsolute,sep} from 'node:path';
 import {compareSnapshots,incomplete,LIMITS} from '../src/index.mjs';
+import {inspectJsonKeys} from '../src/json-keys.mjs';
 
 const args=process.argv.slice(2);
 if(args.length===1&&args[0]==='--help'){
@@ -34,7 +35,11 @@ if(args.length===1&&args[0]==='--help'){
       if(info.size>LIMITS.manifestBytes)return {error:incomplete('byte-limit',file)};
       const bytes=await readFile(path,{signal:AbortSignal.timeout(LIMITS.milliseconds)});
       if(bytes.length>LIMITS.manifestBytes)return {error:incomplete('byte-limit',file)};
-      return {value:JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes))};
+      const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+      const value=JSON.parse(text);
+      const problem=inspectJsonKeys(text);
+      if(problem)return {error:incomplete(problem==='duplicate'?'duplicate-key':'depth-limit',file)};
+      return {value};
     }catch{return {error:incomplete('input-unreadable',file)};}
   }
   const a=await readManifest(baseline,'@baseline'),b=await readManifest(current,'@current');

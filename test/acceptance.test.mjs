@@ -183,3 +183,21 @@ test('one manifest file cannot be passed as both captures',()=>{
     assert.equal(p.status,2);assert.equal(p.stdout,'');
   }finally{rmSync(root,{recursive:true,force:true});}
 });
+
+test('duplicate JSON completeness keys are incomplete on either side, including escaped spelling',()=>{
+  const root=mkdtempSync(join(tmpdir(),'route-duplicate-json-'));
+  try{
+    const clean=JSON.stringify(manifest());
+    writeFileSync(join(root,'shot.svg'),shot);
+    const invoke=(first,second)=>{
+      writeFileSync(join(root,'base.json'),first);writeFileSync(join(root,'current.json'),second);
+      return spawnSync(process.execPath,[cli,'--root',root,'--baseline','base.json','--current','current.json'],{encoding:'utf8'});
+    };
+    const top=clean.replace('"complete":true','"complete":false,"complete":true');
+    const a=invoke(top,clean);
+    assert.equal(a.status,2);assert.equal(JSON.parse(a.stdout).findings[0].ruleId,'duplicate-key');
+    const nested=clean.replace('"capture":{"complete":true','"capture":{"com\\u0070lete":false,"complete":true');
+    const b=invoke(clean,nested);
+    assert.equal(b.status,2);assert.equal(JSON.parse(b.stdout).findings[0].ruleId,'duplicate-key');
+  }finally{rmSync(root,{recursive:true,force:true});}
+});
