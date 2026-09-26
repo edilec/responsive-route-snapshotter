@@ -1,0 +1,19 @@
+{
+  "name": "responsive-route-snapshotter",
+  "version": "1.0.0",
+  "description": "Compare two pre-captured local route screenshot manifests offline.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "node --check src/index.mjs && node --check src/json-keys.mjs && node --check bin/responsive-route-snapshotter.mjs",
+    "test": "node --test",
+    "check": "npm run lint && npm test"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edilec/responsive-route-snapshotter"
+  }
+}
